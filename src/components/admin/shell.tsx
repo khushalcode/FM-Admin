@@ -5,7 +5,7 @@ import {
   LayoutDashboard, ShoppingBag, Package, Store, Tag, Users,
   Truck, Ticket, Image as ImageIcon, Bell, BarChart3, Settings,
   ShoppingBag as Logo, Search, ChevronDown, LogOut, Menu, X,
-  CheckCircle2, Circle, AlertCircle, Wallet, FileBarChart,
+  CheckCircle2, Circle, AlertCircle, Wallet, FileBarChart, Star,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isSupabaseConfigured } from '@/lib/supabase'
@@ -31,6 +31,13 @@ import {
   WalletsVendorsView,
   WalletsDeliveryView,
 } from './views/wallets'
+import {
+  LiveTrackingView,
+  ReviewsView,
+  RefundsView,
+  PayoutsView,
+  PushCampaignsView,
+} from './views/new-views'
 import { useAdminState, notificationActions } from '@/lib/admin-data'
 
 type View =
@@ -38,6 +45,7 @@ type View =
   | 'customers' | 'vendors' | 'delivery-men' | 'coupons' | 'banners'
   | 'notifications' | 'analytics' | 'settings' | 'reports'
   | 'wallets-customers' | 'wallets-vendors' | 'wallets-delivery'
+  | 'live-tracking' | 'reviews' | 'refunds' | 'payouts' | 'push-campaigns'
 
 const NAV: Array<{ id: View; label: string; icon: typeof LayoutDashboard; group: string }> = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Overview' },
@@ -55,6 +63,11 @@ const NAV: Array<{ id: View; label: string; icon: typeof LayoutDashboard; group:
   { id: 'wallets-customers', label: 'Customer Wallets', icon: Wallet, group: 'Wallets' },
   { id: 'wallets-vendors', label: 'Vendor Wallets', icon: Wallet, group: 'Wallets' },
   { id: 'wallets-delivery', label: 'Delivery Wallets', icon: Wallet, group: 'Wallets' },
+  { id: 'live-tracking', label: 'Live Tracking', icon: Truck, group: 'Operations' },
+  { id: 'reviews', label: 'Reviews', icon: Star, group: 'Operations' },
+  { id: 'refunds', label: 'Refunds', icon: AlertCircle, group: 'Operations' },
+  { id: 'payouts', label: 'Payouts', icon: Wallet, group: 'Operations' },
+  { id: 'push-campaigns', label: 'Push Campaigns', icon: Bell, group: 'Marketing' },
   { id: 'notifications', label: 'Notifications', icon: Bell, group: 'System' },
   { id: 'settings', label: 'Settings', icon: Settings, group: 'System' },
 ]
@@ -373,6 +386,11 @@ export function AdminShell() {
           {view === 'wallets-customers' && <WalletsCustomersView />}
           {view === 'wallets-vendors' && <WalletsVendorsView />}
           {view === 'wallets-delivery' && <WalletsDeliveryView />}
+          {view === 'live-tracking' && <LiveTrackingView />}
+          {view === 'reviews' && <ReviewsView />}
+          {view === 'refunds' && <RefundsView />}
+          {view === 'payouts' && <PayoutsView />}
+          {view === 'push-campaigns' && <PushCampaignsView />}
         </main>
       </div>
     </div>

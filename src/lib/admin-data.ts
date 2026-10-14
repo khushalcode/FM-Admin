@@ -78,6 +78,12 @@ function save() {
   if (!_state) return
   try {
     window.localStorage.setItem(KEY, JSON.stringify(_state))
+    // Broadcast to other tabs/components in the same tab
+    try {
+      const ch = new BroadcastChannel('foodmunch-sync')
+      ch.postMessage({ type: 'state-updated', timestamp: Date.now() })
+      ch.close()
+    } catch {}
   } catch (e) {
     console.warn('[admin-data] save failed:', e)
   }
@@ -106,14 +112,19 @@ import { useEffect, useReducer } from 'react'
  * Subscribe to admin state changes. Re-renders on every mutation and
  * recomputes the selector — simplest correct pattern (admin panel
  * datasets are small enough that this is fine).
+ *
+ * Can be called with or without a selector:
+ *   useAdminState()              → returns the full State object
+ *   useAdminState(s => s.stores) → returns only stores
  */
-export function useAdminState<T>(selector: (s: State) => T): T {
+export function useAdminState<T = State>(selector?: (s: State) => T): T {
   const [, force] = useReducer((c) => c + 1, 0)
   useEffect(() => {
     const unsub = subscribe(force)
     return () => unsub
   }, [])
-  return selector(load())
+  const state = load()
+  return selector ? selector(state) : (state as unknown as T)
 }
 
 /* ------------------------------------------------------------------ */
@@ -675,3 +686,200 @@ export function resetAllData() {
   save()
   emit()
 }
+
+/* ------------------------------------------------------------------ */
+/*  Cross-tab / cross-component real-time sync                         */
+/*                                                                    */
+/*  When the admin panel changes data (add product, update order      */
+/*  status, send notification, etc.), the customer app must see the   */
+/*  change immediately. We use a BroadcastChannel for same-origin     */
+/*  same-tab notifications, plus a storage event listener for          */
+/*  cross-tab sync.                                                   */
+/* ------------------------------------------------------------------ */
+
+if (typeof window !== 'undefined') {
+  // Cross-tab: listen for localStorage changes from other tabs
+  window.addEventListener('storage', (e) => {
+    if (e.key === KEY && e.newValue) {
+      try {
+        _state = JSON.parse(e.newValue)
+        emit()
+      } catch {}
+    }
+  })
+
+  // Same-tab: use a BroadcastChannel (or fallback to custom event)
+  try {
+    const channel = new BroadcastChannel('foodmunch-sync')
+    channel.onmessage = (e) => {
+      if (e.data?.type === 'state-updated') {
+        _state = null // force reload from localStorage
+        emit()
+      }
+    }
+  } catch {
+    // BroadcastChannel not available — storage event is enough
+  }
+}
+
+/**
+ * Force a re-read from localStorage and notify all subscribers.
+ * Call this when you know external data has changed.
+ */
+export function refreshState() {
+  _state = null
+  load()
+  emit()
+}
+
+/* ------------------------------------------------------------------ */
+/*  Customer-facing actions (called from customer app, managed by admin) */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Place an order from the customer app. The order appears in the
+ * admin Orders view immediately.
+ */
+export function placeCustomerOrder(order: {
+  store_id: string
+  store_name: string
+  items: { product_id: string; name: string; image_url?: string; unit: string; price: number; quantity: number }[]
+  subtotal: number
+  delivery_fee: number
+  tax: number
+  discount: number
+  total: number
+  payment_method: string
+  delivery_address: string
+}): string {
+  const s = load()
+  const orderId = uid('order')
+  const orderCode = 'ORD' + String(s.orders.length + 1).padStart(4, '0')
+  const newOrder: Order = {
+    id: orderId,
+    order_code: orderCode,
+    customer_id: 'cust_1',
+    customer_name: 'Aarav Sharma',
+    customer_phone: '+91 98765 43210',
+    store_id: order.store_id,
+    store_name: order.store_name,
+    vendor_id: s.stores.find((st) => st.id === order.store_id)?.vendor_id || '',
+    delivery_man_id: null,
+    delivery_man_name: null,
+    items: order.items.map((it) => ({
+      product_id: it.product_id,
+      name: it.name,
+      image_url: it.image_url,
+      unit: it.unit,
+      price: it.price,
+      quantity: it.quantity,
+      store_id: order.store_id,
+      store_name: order.store_name,
+    })),
+    item_count: order.items.reduce((n, i) => n + i.quantity, 0),
+    subtotal: order.subtotal,
+    delivery_fee: order.delivery_fee,
+    discount: order.discount,
+    tax: order.tax,
+    total: order.total,
+    payment_method: order.payment_method as any,
+    payment_status: 'pending',
+    status: 'pending',
+    delivery_address: order.delivery_address,
+    note: '',
+    scheduled_at: null,
+    accepted_at: null,
+    picked_up_at: null,
+    delivered_at: null,
+    rating: undefined,
+    created_at: new Date().toISOString(),
+  }
+  s.orders = [newOrder, ...s.orders]
+  save(); emit()
+  return orderId
+}
+
+/**
+ * Admin sends a notification — it appears in the customer app's
+ * Notifications screen immediately.
+ */
+export function sendCustomerNotification(notif: {
+  title: string
+  body: string
+  type?: 'order' | 'offer' | 'wallet' | 'system'
+  data?: Record<string, any>
+}) {
+  const s = load()
+  const n: Notification = {
+    id: uid('notif'),
+    type: notif.type || 'system',
+    title: notif.title,
+    body: notif.body,
+    data: notif.data || {},
+    is_read: false,
+    created_at: new Date().toISOString(),
+  }
+  s.notifications = [n, ...s.notifications]
+  save(); emit()
+  return n.id
+}
+
+/**
+ * Admin adjusts a customer's wallet balance — the customer sees
+ * the new balance and a transaction entry immediately.
+ */
+export function adjustCustomerWallet(
+  customerId: string,
+  amount: number,
+  type: 'credit' | 'debit',
+  description: string
+) {
+  const s = load()
+  const txn: WalletTransaction = {
+    id: uid('wtxn'),
+    user_id: customerId,
+    user_role: 'customer',
+    user_name: s.customers.find((c) => c.id === customerId)?.full_name || 'Customer',
+    type: type as WalletTxType,
+    source: 'admin_adjustment',
+    amount,
+    balance_after: 0, // computed below
+    description,
+    created_by: 'admin',
+    created_at: new Date().toISOString(),
+  }
+  // Update customer's wallet balance
+  s.customers = s.customers.map((c) =>
+    c.id === customerId
+      ? { ...c, wallet_balance: (c.wallet_balance || 0) + (type === 'credit' ? amount : -amount) }
+      : c
+  )
+  const customer = s.customers.find((c) => c.id === customerId)
+  txn.balance_after = customer?.wallet_balance || 0
+  s.walletTransactions = [txn, ...s.walletTransactions]
+  save(); emit()
+  return txn.id
+}
+
+/**
+ * Admin updates order status — customer sees the updated tracking
+ * timeline in real-time.
+ */
+export function updateOrderStatus(orderId: string, status: OrderStatus) {
+  orderActions.updateStatus(orderId, status)
+}
+
+/**
+ * Admin toggles product availability — customer app hides/unhides
+ * the product immediately.
+ */
+export function toggleProductAvailability(productId: string) {
+  productActions.toggleAvailability(productId)
+}
+
+/**
+ * Admin adds/edits/removes a coupon — customer sees it in Coupons
+ * screen immediately (no refresh needed).
+ */
+// couponActions already handles this — just re-export for convenience
+export { couponActions as customerCouponActions }
