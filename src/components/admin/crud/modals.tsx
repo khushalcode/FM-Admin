@@ -6,11 +6,13 @@
 import { useState, useEffect } from 'react'
 import {
   Modal, Field, SelectField, TextareaField, PrimaryButton, Toggle,
+  ImageUpload, SwButton, SwSectionLabel,
   formatCurrency,
 } from '../shared'
 import { useAdminState, customerActions, vendorActions, deliveryManActions, storeActions, deliveryAreaActions, walletActions } from '@/lib/admin-data'
 import { Customer, Vendor, DeliveryMan, Store, DeliveryArea, WalletTxType } from '@/lib/types'
 import { Plus, Trash2, Wallet } from 'lucide-react'
+import { toast } from 'sonner'
 
 /* ------------------------------------------------------------------ */
 /*  Customer Modal                                                     */
@@ -39,28 +41,45 @@ export function CustomerModal({
   }, [editing, open])
 
   const submit = () => {
-    if (!name.trim() || !email.trim() || !phone.trim()) return
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      toast.error('Name, email, and phone are required')
+      return
+    }
+    if (!avatar) {
+      toast.error('Profile image is mandatory — please upload an avatar')
+      return
+    }
     if (editing) {
       customerActions.update(editing.id, { full_name: name, email, phone, avatar_url: avatar })
+      toast.success('Customer updated')
     } else {
       customerActions.create({ full_name: name, email, phone, avatar_url: avatar })
+      toast.success('Customer created')
     }
     onClose()
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit Customer' : 'Add Customer'} description="Customer can sign in with these credentials.">
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit Customer' : 'Add Customer'} description="Customer can sign in with these credentials." size="lg">
       <div className="space-y-4">
-        <Field label="Full Name" value={name} onChange={setName} placeholder="Rahul Sharma" />
-        <Field label="Email Address" value={email} onChange={setEmail} placeholder="rahul@example.com" type="email" />
-        <Field label="Phone Number" value={phone} onChange={setPhone} placeholder="+91 98000 00000" />
+        <ImageUpload
+          label="Profile Image"
+          value={avatar}
+          onChange={setAvatar}
+          required
+          description="PNG, JPG up to 2MB · 1:1 ratio recommended"
+          maxSizeMB={2}
+          aspect="square"
+        />
+        <Field label="Full Name *" value={name} onChange={setName} placeholder="Rahul Sharma" />
+        <Field label="Email Address *" value={email} onChange={setEmail} placeholder="rahul@example.com" type="email" />
+        <Field label="Phone Number *" value={phone} onChange={setPhone} placeholder="+91 98000 00000" />
         {!editing && (
           <Field label="Temporary Password" value={password} onChange={setPassword} placeholder="••••••••" type="password" />
         )}
-        <Field label="Avatar URL (optional)" value={avatar} onChange={setAvatar} placeholder="https://..." />
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted">Cancel</button>
-          <PrimaryButton onClick={submit}>{editing ? 'Save Changes' : 'Create Customer'}</PrimaryButton>
+          <SwButton variant="outline" onClick={onClose}>Cancel</SwButton>
+          <SwButton onClick={submit}>{editing ? 'Save Changes' : 'Create Customer'}</SwButton>
         </div>
       </div>
     </Modal>
@@ -83,35 +102,54 @@ export function VendorModal({
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [storeName, setStoreName] = useState('')
+  const [avatar, setAvatar] = useState('')
 
   useEffect(() => {
     if (editing) {
       setName(editing.full_name); setEmail(editing.email); setPhone(editing.phone)
-      setPassword(''); setStoreName('')
+      setPassword(''); setStoreName(''); setAvatar(editing.avatar_url || '')
     } else {
-      setName(''); setEmail(''); setPhone(''); setPassword(''); setStoreName('')
+      setName(''); setEmail(''); setPhone(''); setPassword(''); setStoreName(''); setAvatar('')
     }
   }, [editing, open])
 
   const submit = () => {
-    if (!name.trim() || !email.trim() || !phone.trim()) return
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      toast.error('Name, email, and phone are required')
+      return
+    }
+    if (!avatar) {
+      toast.error('Profile image is mandatory — please upload an avatar')
+      return
+    }
     if (editing) {
-      vendorActions.update(editing.id, { full_name: name, email, phone })
+      vendorActions.update(editing.id, { full_name: name, email, phone, avatar_url: avatar })
+      toast.success('Vendor updated')
     } else {
       vendorActions.create({
-        full_name: name, email, phone,
+        full_name: name, email, phone, avatar_url: avatar,
         store_id: storeName.trim() ? `new_${storeName.trim()}` : undefined,
       })
+      toast.success('Vendor created')
     }
     onClose()
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit Vendor' : 'Add Vendor'}>
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit Vendor' : 'Add Vendor'} size="lg">
       <div className="space-y-4">
-        <Field label="Vendor Full Name" value={name} onChange={setName} placeholder="Vikram Sharma" />
-        <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="vikram@store.com" />
-        <Field label="Phone" value={phone} onChange={setPhone} placeholder="+91 98000 00000" />
+        <ImageUpload
+          label="Profile Image"
+          value={avatar}
+          onChange={setAvatar}
+          required
+          description="PNG, JPG up to 2MB · 1:1 ratio"
+          maxSizeMB={2}
+          aspect="square"
+        />
+        <Field label="Vendor Full Name *" value={name} onChange={setName} placeholder="Vikram Sharma" />
+        <Field label="Email *" value={email} onChange={setEmail} type="email" placeholder="vikram@store.com" />
+        <Field label="Phone *" value={phone} onChange={setPhone} placeholder="+91 98000 00000" />
         {!editing && (
           <>
             <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" />
@@ -119,8 +157,8 @@ export function VendorModal({
           </>
         )}
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted">Cancel</button>
-          <PrimaryButton onClick={submit}>{editing ? 'Save Changes' : 'Create Vendor'}</PrimaryButton>
+          <SwButton variant="outline" onClick={onClose}>Cancel</SwButton>
+          <SwButton onClick={submit}>{editing ? 'Save Changes' : 'Create Vendor'}</SwButton>
         </div>
       </div>
     </Modal>
@@ -143,32 +181,51 @@ export function DeliveryManModal({
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [vehicle, setVehicle] = useState<DeliveryMan['vehicle_type']>('bike')
+  const [avatar, setAvatar] = useState('')
 
   useEffect(() => {
     if (editing) {
       setName(editing.full_name); setEmail(editing.email); setPhone(editing.phone)
-      setVehicle(editing.vehicle_type); setPassword('')
+      setVehicle(editing.vehicle_type); setPassword(''); setAvatar(editing.avatar_url || '')
     } else {
-      setName(''); setEmail(''); setPhone(''); setPassword(''); setVehicle('bike')
+      setName(''); setEmail(''); setPhone(''); setPassword(''); setVehicle('bike'); setAvatar('')
     }
   }, [editing, open])
 
   const submit = () => {
-    if (!name.trim() || !email.trim() || !phone.trim()) return
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      toast.error('Name, email, and phone are required')
+      return
+    }
+    if (!avatar) {
+      toast.error('Profile image is mandatory — please upload an avatar')
+      return
+    }
     if (editing) {
-      deliveryManActions.update(editing.id, { full_name: name, email, phone, vehicle_type: vehicle })
+      deliveryManActions.update(editing.id, { full_name: name, email, phone, vehicle_type: vehicle, avatar_url: avatar })
+      toast.success('Delivery partner updated')
     } else {
-      deliveryManActions.create({ full_name: name, email, phone, vehicle_type: vehicle })
+      deliveryManActions.create({ full_name: name, email, phone, vehicle_type: vehicle, avatar_url: avatar })
+      toast.success('Delivery partner created')
     }
     onClose()
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit Delivery Man' : 'Add Delivery Man'}>
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit Delivery Man' : 'Add Delivery Man'} size="lg">
       <div className="space-y-4">
-        <Field label="Full Name" value={name} onChange={setName} placeholder="Ramesh Kumar" />
-        <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="ramesh@delivery.com" />
-        <Field label="Phone" value={phone} onChange={setPhone} placeholder="+91 98000 00000" />
+        <ImageUpload
+          label="Profile Image"
+          value={avatar}
+          onChange={setAvatar}
+          required
+          description="PNG, JPG up to 2MB · 1:1 ratio"
+          maxSizeMB={2}
+          aspect="square"
+        />
+        <Field label="Full Name *" value={name} onChange={setName} placeholder="Ramesh Kumar" />
+        <Field label="Email *" value={email} onChange={setEmail} type="email" placeholder="ramesh@delivery.com" />
+        <Field label="Phone *" value={phone} onChange={setPhone} placeholder="+91 98000 00000" />
         {!editing && <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" />}
         <SelectField
           label="Vehicle Type"
@@ -182,8 +239,8 @@ export function DeliveryManModal({
           ]}
         />
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted">Cancel</button>
-          <PrimaryButton onClick={submit}>{editing ? 'Save Changes' : 'Create Delivery Man'}</PrimaryButton>
+          <SwButton variant="outline" onClick={onClose}>Cancel</SwButton>
+          <SwButton onClick={submit}>{editing ? 'Save Changes' : 'Create Delivery Man'}</SwButton>
         </div>
       </div>
     </Modal>
@@ -216,6 +273,9 @@ export function StoreModal({
   const [longitude, setLongitude] = useState('77.5946')
   const [isActive, setIsActive] = useState(true)
   const [isOpen, setIsOpen] = useState(true)
+  // Mandatory logo + cover image
+  const [logoUrl, setLogoUrl] = useState('')
+  const [coverUrl, setCoverUrl] = useState('')
 
   useEffect(() => {
     if (editing) {
@@ -225,15 +285,28 @@ export function StoreModal({
       setDeliveryTime(String(editing.delivery_time_minutes)); setCommission(String(editing.commission_percentage))
       setLatitude(editing.latitude ? String(editing.latitude) : ''); setLongitude(editing.longitude ? String(editing.longitude) : '')
       setIsActive(editing.is_active); setIsOpen(editing.is_open)
+      setLogoUrl(editing.logo_url || ''); setCoverUrl(editing.cover_url || '')
     } else {
       setName(''); setVendorId(vendors[0]?.id || ''); setAddress(''); setPhone(''); setEmail('')
       setDescription(''); setMinOrder('200'); setDeliveryFee('30'); setDeliveryTime('35'); setCommission('10')
       setLatitude('12.9716'); setLongitude('77.5946'); setIsActive(true); setIsOpen(true)
+      setLogoUrl(''); setCoverUrl('')
     }
   }, [editing, open, vendors])
 
   const submit = () => {
-    if (!name.trim() || !vendorId) return
+    if (!name.trim() || !vendorId) {
+      toast.error('Store name and vendor are required')
+      return
+    }
+    if (!logoUrl) {
+      toast.error('Restaurant logo is mandatory — please upload a logo image')
+      return
+    }
+    if (!coverUrl) {
+      toast.error('Restaurant cover image is mandatory — please upload a cover')
+      return
+    }
     const payload = {
       name, vendor_id: vendorId, address, phone, email, description,
       minimum_order: Number(minOrder) || 0,
@@ -243,33 +316,64 @@ export function StoreModal({
       latitude: Number(latitude) || undefined,
       longitude: Number(longitude) || undefined,
       is_active: isActive, is_open: isOpen,
+      logo_url: logoUrl,
+      cover_url: coverUrl,
     }
     if (editing) {
       storeActions.update(editing.id, payload)
+      toast.success('Restaurant updated')
     } else {
       storeActions.create(payload)
+      toast.success('Restaurant created')
     }
     onClose()
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit Store' : 'Add Store'} size="lg">
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit Restaurant' : 'Add Restaurant'} size="xl">
       <div className="space-y-4">
+        <SwSectionLabel>Restaurant Images</SwSectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Store Name" value={name} onChange={setName} placeholder="Spice Garden Restaurant" />
+          <ImageUpload
+            label="Restaurant Logo"
+            value={logoUrl}
+            onChange={setLogoUrl}
+            required
+            description="PNG, JPG up to 5MB · 1:1 ratio"
+            maxSizeMB={5}
+            aspect="square"
+          />
+          <ImageUpload
+            label="Cover Image"
+            value={coverUrl}
+            onChange={setCoverUrl}
+            required
+            description="PNG, JPG up to 5MB · 2:1 ratio"
+            maxSizeMB={5}
+            aspect="wide"
+          />
+        </div>
+
+        <SwSectionLabel className="mt-4">Restaurant Information</SwSectionLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Restaurant Name *" value={name} onChange={setName} placeholder="Spice Garden Restaurant" />
           <SelectField
-            label="Vendor"
+            label="Vendor *"
             value={vendorId}
             onChange={setVendorId}
             options={vendors.map((v) => ({ value: v.id, label: v.full_name }))}
           />
         </div>
         <TextareaField label="Description" value={description} onChange={setDescription} placeholder="Authentic Indian cuisine…" />
+
+        <SwSectionLabel className="mt-4">Contact & Location</SwSectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Phone" value={phone} onChange={setPhone} placeholder="+91 80 1234 5678" />
+          <Field label="Phone *" value={phone} onChange={setPhone} placeholder="+91 80 1234 5678" />
           <Field label="Email" value={email} onChange={setEmail} placeholder="orders@store.com" />
         </div>
-        <Field label="Address" value={address} onChange={setAddress} placeholder="12 MG Road, Bangalore" />
+        <Field label="Address *" value={address} onChange={setAddress} placeholder="12 MG Road, Bangalore" />
+
+        <SwSectionLabel className="mt-4">Pricing & Logistics</SwSectionLabel>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <Field label="Min Order ₹" value={minOrder} onChange={setMinOrder} type="number" />
           <Field label="Delivery Fee ₹" value={deliveryFee} onChange={setDeliveryFee} type="number" />
@@ -282,9 +386,9 @@ export function StoreModal({
           <Toggle label="Active" checked={isActive} onChange={setIsActive} />
           <Toggle label="Open Now" checked={isOpen} onChange={setIsOpen} />
         </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted">Cancel</button>
-          <PrimaryButton onClick={submit}>{editing ? 'Save Changes' : 'Create Store'}</PrimaryButton>
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+          <SwButton variant="outline" onClick={onClose}>Cancel</SwButton>
+          <SwButton onClick={submit}>{editing ? 'Save Changes' : 'Create Restaurant'}</SwButton>
         </div>
       </div>
     </Modal>

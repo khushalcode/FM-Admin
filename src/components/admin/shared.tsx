@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { LucideIcon, Search, X, Filter, Download } from 'lucide-react'
+import { LucideIcon, Search, X, Filter, Download, ImagePlus } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import {
   AlertDialog,
@@ -619,3 +619,305 @@ export function timeAgo(iso: string): string {
   if (minutes > 0) return `${minutes}m ago`
   return 'just now'
 }
+
+/* ------------------------------------------------------------------ */
+/*  SwitchEats-style action button (rounded blue / red)                 */
+/*  Matches food-backend-umber AddonsList / DeliverymanList            */
+/* ------------------------------------------------------------------ */
+
+export function SwButton({
+  variant = 'primary',
+  size = 'md',
+  children,
+  onClick,
+  disabled,
+  className,
+  type = 'button',
+}: {
+  variant?: 'primary' | 'danger' | 'outline' | 'ghost' | 'success'
+  size?: 'xs' | 'sm' | 'md'
+  children: React.ReactNode
+  onClick?: (e: React.MouseEvent) => void
+  disabled?: boolean
+  className?: string
+  type?: 'button' | 'submit'
+}) {
+  const variants = {
+    primary: 'bg-blue-600 text-white hover:bg-blue-700',
+    danger: 'bg-red-600 text-white hover:bg-red-700',
+    success: 'bg-emerald-600 text-white hover:bg-emerald-700',
+    outline: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50',
+    ghost: 'bg-transparent text-slate-700 hover:bg-slate-100',
+  }
+  const sizes = {
+    xs: 'px-2 py-1 text-[11px]',
+    sm: 'px-3 py-1.5 text-xs',
+    md: 'px-4 py-2.5 text-sm',
+  }
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'inline-flex items-center justify-center gap-1.5 font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+        variants[variant],
+        sizes[size],
+        className,
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  SwitchEats-style icon action button                                 */
+/*  Matches food-backend-umber p-1.5 rounded text-{color}-600          */
+/* ------------------------------------------------------------------ */
+
+export function SwIconButton({
+  icon: Icon,
+  onClick,
+  label,
+  tone = 'primary',
+  className,
+}: {
+  icon: LucideIcon
+  onClick?: (e: React.MouseEvent) => void
+  label?: string
+  tone?: 'primary' | 'danger' | 'default' | 'success'
+  className?: string
+}) {
+  const tones = {
+    primary: 'text-blue-600 hover:bg-blue-50',
+    danger: 'text-red-600 hover:bg-red-50',
+    success: 'text-emerald-600 hover:bg-emerald-50',
+    default: 'text-slate-600 hover:bg-slate-100',
+  }
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={(e) => { e.stopPropagation(); onClick?.(e) }}
+      className={cn(
+        'p-1.5 rounded transition-colors',
+        tones[tone],
+        className,
+      )}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  SwitchEats-style status badge                                      */
+/*  Matches food-backend-umber px-2 py-1 rounded-full text-xs font-semibold
+/* ------------------------------------------------------------------ */
+
+export function SwBadge({
+  children,
+  color = 'slate',
+}: {
+  children: React.ReactNode
+  color?: 'slate' | 'blue' | 'green' | 'red' | 'amber' | 'purple'
+}) {
+  const colors = {
+    slate: 'bg-slate-100 text-slate-700',
+    blue: 'bg-blue-100 text-blue-700',
+    green: 'bg-green-100 text-green-700',
+    red: 'bg-red-100 text-red-700',
+    amber: 'bg-amber-100 text-amber-700',
+    purple: 'bg-purple-100 text-purple-700',
+  }
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold',
+      colors[color],
+    )}>
+      {children}
+    </span>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  ImageUpload — MANDATORY image uploader with preview                */
+/*  Mirrors food-backend-umber "Click to upload" / "Change Image"     */
+/*  pattern from AddRestaurant / AddEmployee / Banners                 */
+/* ------------------------------------------------------------------ */
+
+export function ImageUpload({
+  label,
+  value,
+  onChange,
+  required = false,
+  description,
+  accept = 'image/*',
+  maxSizeMB = 5,
+  aspect = 'square',
+}: {
+  label: string
+  value: string
+  onChange: (dataUrl: string) => void
+  required?: boolean
+  description?: string
+  accept?: string
+  maxSizeMB?: number
+  aspect?: 'square' | 'video' | 'wide'
+}) {
+  const [error, setError] = useState<string | null>(null)
+
+  const handleFile = (file: File) => {
+    setError(null)
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file (PNG, JPG, WEBP)')
+      return
+    }
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      setError(`Image must be under ${maxSizeMB}MB`)
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      onChange(reader.result as string)
+    }
+    reader.onerror = () => setError('Failed to read file')
+    reader.readAsDataURL(file)
+  }
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFile(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFile(file)
+  }
+
+  const aspectClass = aspect === 'square' ? 'aspect-square' : aspect === 'video' ? 'aspect-video' : 'aspect-[2/1]'
+
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-2">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <div
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+        className={cn(
+          'relative border-2 border-dashed rounded-lg overflow-hidden cursor-pointer transition-colors',
+          error ? 'border-red-300 bg-red-50/30' : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/30',
+          aspectClass,
+        )}
+      >
+        <input
+          type="file"
+          accept={accept}
+          onChange={handleInput}
+          className="absolute inset-0 opacity-0 cursor-pointer"
+        />
+        {value ? (
+          <div className="relative w-full h-full">
+            <img src={value} alt={label} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur">
+                Change Image
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange(''); setError(null) }}
+              className="absolute top-2 right-2 h-6 w-6 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-colors"
+              aria-label="Remove image"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-3">
+            <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center mb-2">
+              <ImagePlus className="h-5 w-5 text-slate-400" />
+            </div>
+            <p className="text-xs font-semibold text-slate-700">Click to upload</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">or drag and drop</p>
+            {description && <p className="text-[10px] text-slate-400 mt-1">{description}</p>}
+          </div>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  SwCard — food-backend-umber styled card                            */
+/*  bg-white rounded-xl shadow-sm border border-slate-200 p-6          */
+/* ------------------------------------------------------------------ */
+
+export function SwCard({
+  children,
+  className,
+  padding = 'md',
+}: {
+  children: React.ReactNode
+  className?: string
+  padding?: 'sm' | 'md' | 'lg' | 'none'
+}) {
+  const pads = {
+    none: '',
+    sm: 'p-4',
+    md: 'p-6',
+    lg: 'p-8',
+  }
+  return (
+    <div className={cn(
+      'bg-white rounded-xl shadow-sm border border-slate-200',
+      pads[padding],
+      className,
+    )}>
+      {children}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  SwPageHeader — food-backend-umber style                            */
+/* ------------------------------------------------------------------ */
+
+export function SwPageHeader({
+  title,
+  subtitle,
+  actions,
+}: {
+  title: string
+  subtitle?: string
+  actions?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
+        {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  SwSectionLabel — section header with bottom border                 */
+/*  Used in AddRestaurant / AddEmployee to group fields                */
+/* ------------------------------------------------------------------ */
+
+export function SwSectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <h3 className={cn('text-sm font-semibold text-slate-700 border-b border-slate-200 pb-2 mb-3', className)}>
+      {children}
+    </h3>
+  )
+}
+
