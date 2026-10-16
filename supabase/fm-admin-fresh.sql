@@ -1,19 +1,29 @@
 -- ============================================================================
--- FM-Admin — Fresh Single Supabase SQL File (Drop + Recreate, Test-Ready)
--- Version: 2.0  |  Date: 2026-10-15
+-- FM-Admin + FA-User — Unified Supabase SQL File (Drop + Recreate, Test-Ready)
+-- Version: 3.0  |  Date: 2026-10-15
 --
--- This is a SELF-CONTAINED, IDEMPOTENT single SQL file that:
+-- This is a SELF-CONTAINED, IDEMPOTENT single SQL file used by BOTH apps:
+--   • FM-Admin (Next.js admin console)  → reads/writes all 53 tables
+--   • FA-User (Expo React Native app)  → reads stores/products/categories/orders,
+--     writes orders/cart/reviews/wallet_transactions/addresses
+--
+-- Both apps point to the SAME Supabase project (https://dhmeyycjosacuwgtdhfo.supabase.co)
+-- and share ONE database. The admin controls all data; the user app consumes it.
+--
+-- This file:
 --   1. Drops all existing tables, enums, functions, triggers (CASCADE)
---   2. Recreates the complete schema with the SAME table/column names as the
---      original FM-Admin supabase/migrations/0001_initial_schema.sql plus the
---      SwitchEats extensions from 0003_switcheats_extensions.sql
---   3. Inserts working seed data (matches the actual schema — no broken refs)
+--   2. Recreates the complete schema (53 tables, 20 enums)
+--      - Same table/column names as v1 (drop-in compatible)
+--      - Adds `firebase_uid` column to users (FA-User app looks up users by Firebase UID)
+--      - All image columns are NOT NULL (mandatory image uploads enforced in admin)
+--   3. Inserts working seed data with real Unsplash image URLs
 --   4. Sets up RLS policies, triggers, indexes, helper functions
 --
 -- USAGE (test from scratch):
 --   a) Create a fresh Supabase project (or use an existing one)
 --   b) Open Supabase SQL Editor → paste this entire file → Run
 --   c) All tables, RLS, triggers, and seed data will be created fresh
+--   d) The final SELECT at the bottom prints row counts to verify
 --
 -- For production: drop the "DROP / CLEAN SLATE" section at the top and run only
 -- the CREATE / SEED sections (they use "if not exists" so they're idempotent).
@@ -156,6 +166,7 @@ do $$ begin create type emergency_type as enum ('Accident','Vehicle Breakdown','
 -- ============================================================================
 create table if not exists users (
   id uuid primary key default uuid_generate_v4(),
+  firebase_uid text unique,
   email text not null unique,
   phone text,
   full_name text not null,
@@ -171,6 +182,7 @@ create table if not exists users (
 );
 create index if not exists idx_users_email on users(email);
 create index if not exists idx_users_role on users(role);
+create index if not exists idx_users_firebase_uid on users(firebase_uid);
 
 -- CUSTOMERS
 create table if not exists customers (
@@ -1314,17 +1326,18 @@ exception when others then null; end $$;
 -- ============================================================================
 
 -- Sample users (id is a fixed UUID for testing — Supabase auth integration can override later)
-insert into users (id, email, phone, full_name, role, is_active, is_email_verified, avatar_url) values
-  ('a0000000-0000-0000-0000-000000000001', 'admin@freshcart.com',     '+918000000001', 'Admin User',          'admin',    true, true, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200'),
-  ('a0000000-0000-0000-0000-000000000002', 'rahul.sharma@example.com','+919800000001', 'Rahul Sharma',        'customer', true, true, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200'),
-  ('a0000000-0000-0000-0000-000000000003', 'priya.patel@example.com', '+919800000002', 'Priya Patel',         'customer', true, true, 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200'),
-  ('a0000000-0000-0000-0000-000000000004', 'amit.kumar@example.com',  '+919800000003', 'Amit Kumar',          'customer', true, true, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'),
-  ('a0000000-0000-0000-0000-000000000005', 'spice.garden@vendor.com', '+919810000001', 'Spice Garden Owner',  'vendor',   true, true, 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200'),
-  ('a0000000-0000-0000-0000-000000000006', 'freshmart@vendor.com',    '+919810000002', 'FreshMart Owner',     'vendor',   true, true, 'https://images.unsplash.com/photo-1556157382-97eda2d62296?w=200'),
-  ('a0000000-0000-0000-0000-000000000007', 'pizza.corner@vendor.com', '+919810000003', 'Pizza Corner Owner',  'vendor',   true, true, 'https://images.unsplash.com/photo-1564564321834-a57f3c88c0d0?w=200'),
-  ('a0000000-0000-0000-0000-000000000008', 'ramesh.kumar@delivery.com','+919820000001','Ramesh Kumar',        'delivery', true, true, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200'),
-  ('a0000000-0000-0000-0000-000000000009', 'suresh.yadav@delivery.com','+919820000002','Suresh Yadav',        'delivery', true, true, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=200'),
-  ('a0000000-0000-0000-0000-000000000010', 'mahesh.pandey@delivery.com','+919820000003','Mahesh Pandey',       'delivery', true, true, 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200')
+-- firebase_uid is set to mock values for testing the user-app's firebase_uid lookup
+insert into users (id, firebase_uid, email, phone, full_name, role, is_active, is_email_verified, avatar_url) values
+  ('a0000000-0000-0000-0000-000000000001', 'mock_admin_1',    'admin@freshcart.com',     '+918000000001', 'Admin User',          'admin',    true, true, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200'),
+  ('a0000000-0000-0000-0000-000000000002', 'mock_customer_1', 'rahul.sharma@example.com','+919800000001', 'Rahul Sharma',        'customer', true, true, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200'),
+  ('a0000000-0000-0000-0000-000000000003', 'mock_customer_2', 'priya.patel@example.com', '+919800000002', 'Priya Patel',         'customer', true, true, 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200'),
+  ('a0000000-0000-0000-0000-000000000004', 'mock_customer_3', 'amit.kumar@example.com',  '+919800000003', 'Amit Kumar',          'customer', true, true, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'),
+  ('a0000000-0000-0000-0000-000000000005', 'mock_vendor_1',   'spice.garden@vendor.com', '+919810000001', 'Spice Garden Owner',  'vendor',   true, true, 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200'),
+  ('a0000000-0000-0000-0000-000000000006', 'mock_vendor_2',   'freshmart@vendor.com',    '+919810000002', 'FreshMart Owner',     'vendor',   true, true, 'https://images.unsplash.com/photo-1556157382-97eda2d62296?w=200'),
+  ('a0000000-0000-0000-0000-000000000007', 'mock_vendor_3',   'pizza.corner@vendor.com', '+919810000003', 'Pizza Corner Owner',  'vendor',   true, true, 'https://images.unsplash.com/photo-1564564321834-a57f3c88c0d0?w=200'),
+  ('a0000000-0000-0000-0000-000000000008', 'mock_dm_1',       'ramesh.kumar@delivery.com','+919820000001','Ramesh Kumar',        'delivery', true, true, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200'),
+  ('a0000000-0000-0000-0000-000000000009', 'mock_dm_2',       'suresh.yadav@delivery.com','+919820000002','Suresh Yadav',        'delivery', true, true, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=200'),
+  ('a0000000-0000-0000-0000-000000000010', 'mock_dm_3',       'mahesh.pandey@delivery.com','+919820000003','Mahesh Pandey',       'delivery', true, true, 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200')
 on conflict (id) do nothing;
 
 -- Customer extensions

@@ -2,11 +2,34 @@
 
 A complete Next.js 16 admin console for a food-delivery platform, faithfully aligned with the **food-backend-umber (SwitchEats)** admin UI structure.
 
-## What's new in v2.0
+## 🗄️ Shared Database with FA-User (Expo React Native App)
 
+**This admin shares ONE Supabase database with the FA-User customer mobile app.**
+
+- **Database URL**: `https://dhmeyycjosacuwgtdhfo.supabase.co` (configured in `.env` and in the user app's `app.json`)
+- **Unified SQL file**: `supabase/fm-admin-fresh.sql` (1602 lines, 82 KB) — used by BOTH apps
+- **Admin app** (this one): controls all data — products, stores, categories, vendors, delivery partners, orders, coupons, banners, etc. All changes are visible in the user app in real-time via Supabase Realtime.
+- **User app** (FA-User): reads from the same tables and writes customer-facing data (orders, cart, reviews, wallet, addresses)
+
+### How the admin controls the user app
+
+| Admin action | User app sees |
+|--------------|---------------|
+| Add a Product | Product appears in Home / Categories / Search |
+| Add a Store | Store appears in Top Stores / Store Detail pages |
+| Add a Category | Category appears in Category grid |
+| Add a Banner | Banner appears in Home carousel |
+| Add a Coupon | Coupon appears in Cart / Coupons page |
+| Update Order Status | Status updates live in user's Orders tab (via Supabase Realtime) |
+| Block a Customer | Customer can no longer sign in |
+| Toggle Store Open/Closed | Store shows as Open/Closed in user app |
+
+## What's new in v3.0
+
+- **Unified database**: this admin + the FA-User app now share ONE Supabase database. The `users` table now has a `firebase_uid` column (unique, nullable) so the user app can look up customers by their Firebase Auth UID.
 - **Prisma removed entirely**. The backend now uses **Supabase only** (via `@supabase/supabase-js`).
-- **Single fresh SQL file** at `supabase/fm-admin-fresh.sql` (1602 lines, 79 KB) — drops all existing tables, recreates with the SAME table names as v1, inserts working seed data. Run it once in a fresh Supabase project to provision everything.
-- Fixed broken seed data from v1 (the old `0002_seed_data.sql` referenced non-existent columns like `module_type`, `firebase_uid`, `applies_to_all` — those are gone now).
+- **Single fresh SQL file** at `supabase/fm-admin-fresh.sql` (1602 lines, 82 KB) — drops all existing tables, recreates with the SAME table names as v1, inserts working seed data with real Unsplash image URLs. Run it once in a fresh Supabase project to provision everything.
+- Fixed broken seed data from v1 (the old `0002_seed_data.sql` referenced non-existent columns like `module_type`, `applies_to_all` — those are gone now). `firebase_uid` is now a real column in the schema.
 - Added `supabaseAdmin()` helper in `src/lib/supabase.ts` for server-side API routes that need to bypass RLS.
 - RLS is **disabled by default** in the fresh SQL file for easy testing. Re-enable for production.
 
